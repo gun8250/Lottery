@@ -1,0 +1,5 @@
+{
+  "name": "A-Share KDJ & Volume Filter",
+  "description": "筛选A股市场每日KDJ < 5且成交量持续萎缩的优质超跌股票。",
+  "requestFramePermissions": []
+}
