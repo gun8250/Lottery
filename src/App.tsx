@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { 
   Search, 
   TrendingDown, 
@@ -93,11 +93,19 @@ export default function App() {
     try {
       // Fetch scan status
       const statusRes = await fetch('/api/scan/status');
+      if (!statusRes.ok) {
+        const text = await statusRes.text();
+        throw new Error(`获取状态失败 (${statusRes.status}): ${text.substring(0, 50)}`);
+      }
       const statusData = await statusRes.json();
       setScanStatus(statusData);
 
       // Fetch filtered stocks
       const response = await fetch(`/api/stocks/filter?kdj_k=${kdjThreshold}&strategy=${strategy}`);
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`获取股票失败 (${response.status}): ${text.substring(0, 50)}`);
+      }
       const data = await response.json();
       if (response.ok) {
         setStocks(data.stocks);
@@ -105,8 +113,9 @@ export default function App() {
       } else {
         setError(data.error || "获取数据失败");
       }
-    } catch (err) {
-      setError("获取数据时发生网络错误。");
+    } catch (err: any) {
+      console.error("Fetch error:", err);
+      setError(`网络错误: ${err.message || String(err)}`);
     } finally {
       setLoading(false);
     }
@@ -122,15 +131,27 @@ export default function App() {
     }
   };
 
+  const fetchStocksRef = useRef(fetchStocks);
   useEffect(() => {
-    fetchStocks();
+    fetchStocksRef.current = fetchStocks;
+  }, [fetchStocks]);
+
+  useEffect(() => {
+    fetchStocksRef.current();
     
     // Poll for scan status every 5 seconds
     const interval = setInterval(async () => {
       try {
         const statusRes = await fetch('/api/scan/status');
         const statusData = await statusRes.json();
-        setScanStatus(statusData);
+        
+        setScanStatus(prev => {
+          if (prev && prev.is_scanning === 1 && statusData.is_scanning === 0) {
+            // Scan just finished, refresh stocks using the latest function
+            fetchStocksRef.current();
+          }
+          return statusData;
+        });
       } catch (e) {
         // Ignore
       }

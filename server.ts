@@ -22,7 +22,8 @@ const httpAgent = new http.Agent({ family: 4 });
 const httpsAgent = new https.Agent({ family: 4 });
 
 // Database Setup
-const db = new Database("stocks.db");
+const dbPath = process.env.NODE_ENV === "production" ? "/tmp/stocks.db" : "stocks.db";
+const db = new Database(dbPath);
 db.exec(`
   CREATE TABLE IF NOT EXISTS scan_status (
     id INTEGER PRIMARY KEY,
