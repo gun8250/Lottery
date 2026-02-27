@@ -4,12 +4,22 @@ import axios from "axios";
 import iconv from "iconv-lite";
 import dotenv from "dotenv";
 import path from "path";
+import { fileURLToPath } from "url";
 import Database from "better-sqlite3";
+import http from "http";
+import https from "https";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Force IPv4 for external requests to avoid socket hang up issues
+const httpAgent = new http.Agent({ family: 4 });
+const httpsAgent = new https.Agent({ family: 4 });
 
 // Database Setup
 const db = new Database("stocks.db");
@@ -45,7 +55,9 @@ async function fetchEastmoneyData(url: string) {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://quote.eastmoney.com/center/gridlist.html"
-      }
+      },
+      httpAgent,
+      httpsAgent
     });
     return response.data;
   } catch (error: any) {
@@ -61,7 +73,9 @@ async function fetchSinaData(url: string) {
       headers: {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "http://finance.sina.com.cn/stock/quotes/center/hsa.shtml"
-      }
+      },
+      httpAgent,
+      httpsAgent
     });
     return response.data;
   } catch (error: any) {
@@ -325,7 +339,11 @@ async function fetchTencentHistory(symbol: string, market: number, retries = 1) 
     }
     
     const url = `https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?_var=kline_dayqfq&param=${prefix}${symbol},day,,,120,qfq`;
-    const response = await axios.get(url, { timeout: 4000 });
+    const response = await axios.get(url, { 
+      timeout: 4000,
+      httpAgent,
+      httpsAgent
+    });
     const dataStr = response.data;
     if (!dataStr) return null;
     
@@ -390,7 +408,9 @@ async function fetchIndustryMap() {
               "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
               "Referer": "http://quote.eastmoney.com/center/gridlist.html"
             },
-            timeout: 15000
+            timeout: 15000,
+            httpAgent,
+            httpsAgent
           });
 
           if (res.data && res.data.data && res.data.data.diff) {
@@ -635,6 +655,9 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     app.use(express.static(path.join(__dirname, "dist")));
+    app.get("*", (req, res) => {
+      res.sendFile(path.join(__dirname, "dist", "index.html"));
+    });
   }
 
   app.listen(PORT, "0.0.0.0", () => {
