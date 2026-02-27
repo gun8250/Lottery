@@ -143,6 +143,7 @@ export default function App() {
     const interval = setInterval(async () => {
       try {
         const statusRes = await fetch('/api/scan/status');
+        if (!statusRes.ok) throw new Error(`Status ${statusRes.status}`);
         const statusData = await statusRes.json();
         
         setScanStatus(prev => {
