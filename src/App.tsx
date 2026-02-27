@@ -92,7 +92,7 @@ export default function App() {
     setError(null);
     try {
       // Fetch scan status
-      const statusRes = await fetch('/api/scan/status');
+      const statusRes = await fetch('/api/scan/status', { cache: 'no-store', credentials: 'include' });
       if (!statusRes.ok) {
         const text = await statusRes.text();
         throw new Error(`获取状态失败 (${statusRes.status}): ${text.substring(0, 50)}`);
@@ -101,7 +101,7 @@ export default function App() {
       setScanStatus(statusData);
 
       // Fetch filtered stocks
-      const response = await fetch(`/api/stocks/filter?kdj_k=${kdjThreshold}&strategy=${strategy}`);
+      const response = await fetch(`/api/stocks/filter?kdj_k=${kdjThreshold}&strategy=${strategy}`, { cache: 'no-store', credentials: 'include' });
       if (!response.ok) {
         const text = await response.text();
         throw new Error(`获取股票失败 (${response.status}): ${text.substring(0, 50)}`);
@@ -124,7 +124,7 @@ export default function App() {
   const handleResetScan = async () => {
     if (!confirm("确定要强制重置扫描状态吗？这通常用于修复扫描卡住的问题。")) return;
     try {
-      await fetch('/api/scan/reset', { method: 'POST' });
+      await fetch('/api/scan/reset', { method: 'POST', credentials: 'include' });
       fetchStocks();
     } catch (err) {
       alert("重置失败");
@@ -142,7 +142,7 @@ export default function App() {
     // Poll for scan status every 5 seconds
     const interval = setInterval(async () => {
       try {
-        const statusRes = await fetch('/api/scan/status');
+        const statusRes = await fetch('/api/scan/status', { cache: 'no-store', credentials: 'include' });
         if (!statusRes.ok) throw new Error(`Status ${statusRes.status}`);
         const statusData = await statusRes.json();
         

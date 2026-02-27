@@ -15,7 +15,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Force IPv4 for external requests to avoid socket hang up issues
 const httpAgent = new http.Agent({ family: 4 });
@@ -437,7 +437,13 @@ async function fetchIndustryMap() {
           await new Promise(resolve => setTimeout(resolve, 2000));
         }
       }
-      if (!success) console.warn(`Failed to fetch industry page ${page} after retries.`);
+      if (!success) {
+        console.warn(`Failed to fetch industry page ${page} after retries.`);
+        if (page === 1) {
+          console.warn("Failing fast since the first page failed. EastMoney API might be blocking the IP.");
+          break;
+        }
+      }
       await new Promise(resolve => setTimeout(resolve, 500));
       
       if (Object.keys(industryMap).length > 5500) break;
