@@ -4,6 +4,7 @@ import axios from "axios";
 import iconv from "iconv-lite";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 import Database from "better-sqlite3";
 import http from "http";
@@ -15,7 +16,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Force IPv4 for external requests to avoid socket hang up issues
 const httpAgent = new http.Agent({ family: 4 });
@@ -23,8 +24,7 @@ const httpsAgent = new https.Agent({ family: 4 });
 
 // Database Setup
 const dbPath = process.env.NODE_ENV === "production" ? "/tmp/stocks.db" : "stocks.db";
-const db = new Database(dbPath);
-db.exec(`
+const schemaSql = `
   CREATE TABLE IF NOT EXISTS scan_status (
     id INTEGER PRIMARY KEY,
     last_scan_time TEXT,
@@ -40,7 +40,39 @@ db.exec(`
     PRIMARY KEY (strategy, symbol)
   );
   INSERT OR IGNORE INTO scan_status (id, last_scan_time, is_scanning, progress_current, progress_total) VALUES (1, NULL, 0, 0, 0);
-`);
+`;
+
+function createDatabase(filePath: string) {
+  const database = new Database(filePath);
+  database.exec(schemaSql);
+  return database;
+}
+
+function initDatabase(filePath: string) {
+  try {
+    return createDatabase(filePath);
+  } catch (error: any) {
+    if (error?.code === "SQLITE_CORRUPT" && filePath !== ":memory:") {
+      let newDbPath = filePath;
+      const backupPath = `${filePath}.corrupt.${Date.now()}`;
+      try {
+        if (fs.existsSync(filePath)) {
+          fs.renameSync(filePath, backupPath);
+          console.warn(`Corrupted database moved to: ${backupPath}`);
+        }
+      } catch (renameError: any) {
+        const parsed = path.parse(filePath);
+        newDbPath = path.join(parsed.dir, `${parsed.name}.runtime.${Date.now()}${parsed.ext || ".db"}`);
+        console.warn(`Failed to move corrupted database (${renameError.code}). Using a new database: ${newDbPath}`);
+      }
+      console.warn("Recreating database due to SQLITE_CORRUPT...");
+      return createDatabase(newDbPath);
+    }
+    throw error;
+  }
+}
+
+const db = initDatabase(dbPath);
 
 app.use(express.json());
 
